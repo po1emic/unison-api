@@ -1,0 +1,112 @@
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../generated/prisma"
+  binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x", "darwin-arm64"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id String @default(uuid()) @db.Uuid
+
+  email        String    @unique @db.VarChar(255)
+  passwordHash String    @map("password_hash") @db.VarChar(128)
+  refreshToken String?   @map("refresh_token") @db.VarChar(500)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  communities Community[]
+  memberships Member[]
+  messages    Message[]
+  Channel     Channel[]
+
+  @@id([id])
+  @@index([id])
+  @@index([email])
+  @@map("users")
+}
+
+model Community {
+  id      String @default(uuid()) @db.Uuid
+  ownerId String @map("owner_id") @db.Uuid
+
+  name        String    @db.VarChar(128)
+  description String    @db.VarChar(300)
+  isPrivate   Boolean   @default(true) @map("is_private")
+  avatarSrc   String?   @db.Text
+  bannerSrc   String?   @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  owner    User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  members  Member[]
+  channels Channel[]
+
+  @@id([id])
+  @@index([id])
+  @@index([name])
+  @@map("communities")
+}
+
+model Member {
+  userId      String @map("user_id") @db.Uuid
+  communityId String @map("community_id") @db.Uuid
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+
+  @@id([userId, communityId])
+  @@index([userId])
+  @@index([communityId])
+  @@map("community_members")
+}
+
+model Channel {
+  id          String @default(uuid()) @db.Uuid
+  userId      String @map("user_id") @db.Uuid
+  communityId String @map("community_id") @db.Uuid
+
+  name      String      @db.VarChar(24)
+  type      ChannelType
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime?   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  creator   User      @relation(fields: [userId], references: [id])
+  messages  Message[]
+
+  @@id([id])
+  @@index([userId])
+  @@index([communityId])
+  @@map("channels")
+}
+
+enum ChannelType {
+  CONFERENCE
+  CHAT
+}
+
+model Message {
+  id        String @default(uuid()) @db.Uuid
+  userId    String @map("user_id") @db.Uuid
+  channelId String @map("channel_id") @db.Uuid
+
+  content   String    @db.Text
+  fileUrl   String?   @db.Text
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  author  User    @relation(fields: [userId], references: [id])
+  channel Channel @relation(fields: [channelId], references: [id])
+
+  @@id([id])
+  @@index([userId])
+  @@index([channelId])
+  @@map("messages")
+}
